@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File to CSV Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.2/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .input-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 2px dashed #dee2e6;
+            transition: all 0.3s ease;
+        }
+
+        .input-section:hover {
+            border-color: #4facfe;
+            background: #f0f8ff;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: #6c757d;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            color: #4facfe;
+            border-bottom-color: #4facfe;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .file-upload {
+            border: 2px dashed #4facfe;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background: white;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .file-upload:hover {
+            background: #f0f8ff;
+            border-color: #0056b3;
+        }
+
+        .file-upload.dragover {
+            background: #e3f2fd;
+            border-color: #1976d2;
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #4facfe;
+            margin-bottom: 15px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-text {
+            font-size: 1.1rem;
+            color: #495057;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        .text-input {
+            width: 100%;
+            min-height: 200px;
+            padding: 20px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: #4facfe;
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(79, 172, 254, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 172, 254, 0.4);
+        }
+
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .output-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .output-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #343a40;
+        }
+
+        .copy-btn, .download-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            margin-left: 10px;
+        }
+
+        .copy-btn:hover, .download-btn:hover {
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .output-text {
+            width: 100%;
+            min-height: 300px;
+            padding: 20px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            background: white;
+            resize: vertical;
+        }
+
+        .file-info {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            display: none;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        .error-message {
+            background: #ffebee;
+            border: 1px solid #f44336;
+            color: #d32f2f;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .success-message {
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            color: #2e7d32;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4facfe;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .preview-table {
+            overflow-x: auto;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            background: white;
+        }
+
+        .preview-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .preview-table th,
+        .preview-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .preview-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .preview-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 10px;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            .tab {
+                border-bottom: 1px solid #e9ecef;
+                border-right: none;
+            }
+
+            .output-header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 File to CSV Converter</h1>
+            <p>Convert Excel, Word documents, and text files to CSV format easily</p>
+        </div>
+
+        <div class="main-content">
+            <div class="input-section">
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('upload')">📁 File Upload</button>
+                    <button class="tab" onclick="switchTab('text')">📝 Text Input</button>
+                </div>
+
+                <div id="upload-tab" class="tab-content active">
+                    <div class="file-upload" onclick="document.getElementById('fileInput').click()">
+                        <div class="upload-icon">📤</div>
+                        <div class="upload-text">Click to upload or drag and drop</div>
+                        <div class="upload-subtext">Supports Excel (.xlsx, .xls), Word (.docx), Text (.txt, .csv) files</div>
+                        <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls,.docx,.txt,.csv">
+                    </div>
+                </div>
+
+                <div id="text-tab" class="tab-content">
+                    <textarea id="textInput" class="text-input" placeholder="Paste your tabular data here...&#10;Example:&#10;EmpID    Name    Department    Position&#10;E001    John Smith    Engineering    Senior Developer&#10;E002    Mary Jones    Marketing    Marketing Manager"></textarea>
+                    <br><br>
+                    <button class="btn" onclick="processTextInput()">Convert Text to CSV</button>
+                </div>
+
+                <div class="file-info" id="fileInfo"></div>
+                <div class="error-message" id="errorMessage"></div>
+                <div class="success-message" id="successMessage"></div>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <div>Processing file...</div>
+                </div>
+            </div>
+
+            <div class="output-section">
+                <div class="output-header">
+                    <div class="output-title">📋 CSV Output</div>
+                    <div>
+                        <button class="btn copy-btn" onclick="copyToClipboard()">📋 Copy</button>
+                        <button class="btn download-btn" onclick="downloadCSV()">💾 Download</button>
+                    </div>
+                </div>
+                <textarea id="csvOutput" class="output-text" readonly placeholder="Your CSV output will appear here..."></textarea>
+                <div class="preview-table" id="previewTable"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentCSVData = '';
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
+
+        // File upload handling
+        const fileUpload = document.querySelector('.file-upload');
+        const fileInput = document.getElementById('fileInput');
+
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.classList.add('dragover');
+        });
+
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.classList.remove('dragover');
+        });
+
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUpload.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // File processing
+        async function handleFile(file) {
+            showLoading(true);
+            hideMessages();
+
+            try {
+                const fileInfo = `File: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+                showFileInfo(fileInfo);
+
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+                let csvData = '';
+
+                switch (fileExtension) {
+                    case 'xlsx':
+                    case 'xls':
+                        csvData = await processExcelFile(file);
+                        break;
+                    case 'docx':
+                        csvData = await processWordFile(file);
+                        break;
+                    case 'txt':
+                    case 'csv':
+                        csvData = await processTextFile(file);
+                        break;
+                    default:
+                        throw new Error('Unsupported file format. Please use .xlsx, .xls, .docx, .txt, or .csv files.');
+                }
+
+                displayCSV(csvData);
+                showSuccess('File processed successfully!');
+
+            } catch (error) {
+                showError('Error processing file: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Excel file processing
+        async function processExcelFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        
+                        // Convert to CSV
+                        const csvData = jsonData.map(row => 
+                            row.map(cell => {
+                                const cellStr = String(cell || '');
+                                // Escape quotes and wrap in quotes if contains comma, quote, or newline
+                                if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                                    return '"' + cellStr.replace(/"/g, '""') + '"';
+                                }
+                                return cellStr;
+                            }).join(',')
+                        ).join('\n');
+                        
+                        resolve(csvData);
+                    } catch (error) {
+                        reject(new Error('Failed to parse Excel file: ' + error.message));
+                    }
+                };
+                reader.onerror = () => reject(new Error('Failed to read Excel file'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // Word file processing
+        async function processWordFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const arrayBuffer = e.target.result;
+                        const result = await mammoth.extractRawText({ arrayBuffer });
+                        const text = result.value;
+                        
+                        // Try to detect table structure
+                        const lines = text.split('\n').filter(line => line.trim());
+                        const csvData = lines.map(line => {
+                            // Split by tabs or multiple spaces
+                            const cells = line.split(/\t+|\s{2,}/).filter(cell => cell.trim());
+                            return cells.map(cell => {
+                                const cellStr = cell.trim();
+                                if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                                    return '"' + cellStr.replace(/"/g, '""') + '"';
+                                }
+                                return cellStr;
+                            }).join(',');
+                        }).join('\n');
+                        
+                        resolve(csvData);
+                    } catch (error) {
+                        reject(new Error('Failed to parse Word document: ' + error.message));
+                    }
+                };
+                reader.onerror = () => reject(new Error('Failed to read Word document'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // Text file processing
+        async function processTextFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const text = e.target.result;
+                        const csvData = convertTextToCSV(text);
+                        resolve(csvData);
+                    } catch (error) {
+                        reject(new Error('Failed to parse text file: ' + error.message));
+                    }
+                };
+                reader.onerror = () => reject(new Error('Failed to read text file'));
+                reader.readAsText(file);
+            });
+        }
+
+        // Text input processing
+        function processTextInput() {
+            const textInput = document.getElementById('textInput');
+            const text = textInput.value.trim();
+            
+            if (!text) {
+                showError('Please enter some text data');
+                return;
+            }
+
+            try {
+                const csvData = convertTextToCSV(text);
+                displayCSV(csvData);
+                showSuccess('Text converted successfully!');
+            } catch (error) {
+                showError('Error converting text: ' + error.message);
+            }
+        }
+
+        // Convert text to CSV
+        function convertTextToCSV(text) {
+            const lines = text.split('\n').filter(line => line.trim());
+            
+            // Try different delimiters
+            const delimiters = ['\t', '|', ';', ',', /\s{2,}/];
+            let bestDelimiter = '\t';
+            let maxColumns = 0;
+            
+            // Find the delimiter that gives the most consistent column count
+            for (const delimiter of delimiters) {
+                const testLines = lines.slice(0, Math.min(5, lines.length));
+                const columnCounts = testLines.map(line => {
+                    if (delimiter instanceof RegExp) {
+                        return line.split(delimiter).length;
+                    }
+                    return line.split(delimiter).length;
+                });
+                
+                const avgColumns = columnCounts.reduce((a, b) => a + b, 0) / columnCounts.length;
+                if (avgColumns > maxColumns && columnCounts.every(count => count >= avgColumns * 0.8)) {
+                    maxColumns = avgColumns;
+                    bestDelimiter = delimiter;
+                }
+            }
+            
+            // Convert to CSV
+            const csvLines = lines.map(line => {
+                let cells;
+                if (bestDelimiter instanceof RegExp) {
+                    cells = line.split(bestDelimiter);
+                } else {
+                    cells = line.split(bestDelimiter);
+                }
+                
+                return cells.map(cell => {
+                    const cellStr = cell.trim();
+                    if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                        return '"' + cellStr.replace(/"/g, '""') + '"';
+                    }
+                    return cellStr;
+                }).join(',');
+            });
+            
+            return csvLines.join('\n');
+        }
+
+        // Display CSV
+        function displayCSV(csvData) {
+            currentCSVData = csvData;
+            document.getElementById('csvOutput').value = csvData;
+            
+            // Create preview table
+            createPreviewTable(csvData);
+        }
+
+        // Create preview table
+        function createPreviewTable(csvData) {
+            const previewTable = document.getElementById('previewTable');
+            
+            if (!csvData.trim()) {
+                previewTable.innerHTML = '';
+                return;
+            }
+            
+            try {
+                const lines = csvData.split('\n').filter(line => line.trim());
+                if (lines.length === 0) return;
+                
+                const parsed = Papa.parse(csvData, { header: false });
+                const data = parsed.data.filter(row => row.some(cell => cell.trim()));
+                
+                if (data.length === 0) return;
+                
+                let tableHTML = '<table>';
+                
+                // Header row
+                if (data.length > 0) {
+                    tableHTML += '<thead><tr>';
+                    data[0].forEach(cell => {
+                        tableHTML += `<th>${escapeHtml(cell || '')}</th>`;
+                    });
+                    tableHTML += '</tr></thead>';
+                }
+                
+                // Data rows (show max 10 rows for preview)
+                tableHTML += '<tbody>';
+                const rowsToShow = Math.min(10, data.length);
+                for (let i = 1; i < rowsToShow; i++) {
+                    tableHTML += '<tr>';
+                    data[i].forEach(cell => {
+                        tableHTML += `<td>${escapeHtml(cell || '')}</td>`;
+                    });
+                    tableHTML += '</tr>';
+                }
+                
+                if (data.length > 10) {
+                    tableHTML += `<tr><td colspan="${data[0].length}" style="text-align: center; font-style: italic; color: #6c757d;">... and ${data.length - 10} more rows</td></tr>`;
+                }
+                
+                tableHTML += '</tbody></table>';
+                previewTable.innerHTML = tableHTML;
+                
+            } catch (error) {
+                previewTable.innerHTML = '<p style="color: #dc3545;">Error creating table preview</p>';
+            }
+        }
+
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('show', show);
+        }
+
+        function showFileInfo(info) {
+            const fileInfo = document.getElementById('fileInfo');
+            fileInfo.textContent = info;
+            fileInfo.classList.add('show');
+        }
+
+        function showError(message) {
+            const errorMsg = document.getElementById('errorMessage');
+            errorMsg.textContent = message;
+            errorMsg.classList.add('show');
+        }
+
+        function showSuccess(message) {
+            const successMsg = document.getElementById('successMessage');
+            successMsg.textContent = message;
+            successMsg.classList.add('show');
+        }
+
+        function hideMessages() {
+            document.querySelectorAll('.file-info, .error-message, .success-message').forEach(el => {
+                el.classList.remove('show');
+            });
+        }
+
+        // Copy to clipboard
+        async function copyToClipboard() {
+            if (!currentCSVData) {
+                showError('No CSV data to copy');
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(currentCSVData);
+                showSuccess('CSV data copied to clipboard!');
+            } catch (error) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = currentCSVData;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showSuccess('CSV data copied to clipboard!');
+            }
+        }
+
+        // Download CSV
+        function downloadCSV() {
+            if (!currentCSVData) {
+                showError('No CSV data to download');
+                return;
+            }
+
+            const blob = new Blob([currentCSVData], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'converted_data.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showSuccess('CSV file downloaded!');
+        }
+
+        // Initialize with sample data
+        window.addEventListener('load', () => {
+            const sampleData = `EmpID,Name,Department,Position,Salary,JoinDate,Manager,Email,Phone,Location
+E001,John Smith,Engineering,Senior Developer,85000,15-03-2022,Sarah Johnson,john.smith@company.com,+1-555-0101,New York
+E002,Mary Jones,Marketing,Marketing Manager,75000,22-05-2021,David Wilson,mary.jones@company.com,+1-555-0102,Los Angeles`;
+            
+            displayCSV(sampleData);
+        });
+    </script>
+</body>
+</html>
