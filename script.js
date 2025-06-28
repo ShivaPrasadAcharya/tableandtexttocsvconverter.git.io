@@ -259,6 +259,40 @@ function measurePerformance(operation) {
     };
 }
 
+// Recursively flatten nested HTML tables into a 2D array, robust for deeply nested tables
+function flattenHtmlTable(table) {
+    const rows = [];
+    const trs = table.querySelectorAll(':scope > tbody > tr, :scope > tr');
+    trs.forEach(tr => {
+        const row = [];
+        tr.childNodes.forEach(cell => {
+            if (cell.nodeType === 1 && (cell.tagName === 'TD' || cell.tagName === 'TH')) {
+                // If cell contains a nested table, flatten it recursively and join as a string
+                const nestedTable = cell.querySelector('table');
+                if (nestedTable) {
+                    const nestedRows = flattenHtmlTable(nestedTable);
+                    // Represent nested table as a multi-line string in a single cell
+                    row.push(nestedRows.map(r => r.join(' | ')).join('\n'));
+                } else {
+                    row.push(cell.innerText.trim());
+                }
+            }
+        });
+        if (row.length > 0) rows.push(row);
+    });
+    return rows;
+}
+
+// Convert HTML table string to CSV, supporting nested tables
+function htmlTableToCSV(html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const table = doc.querySelector('table');
+    if (!table) return '';
+    const rows = flattenHtmlTable(table);
+    return rows.map(row => row.map(formatCSVCell).join(',')).join('\n');
+}
+
 // Export utilities for use in the main application
 window.FileConverterUtils = {
     formatCSVCell,
@@ -268,5 +302,7 @@ window.FileConverterUtils = {
     validateCSV,
     processWordWithTables,
     handleFileError,
-    measurePerformance
+    measurePerformance,
+    htmlTableToCSV,
+    flattenHtmlTable
 };

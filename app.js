@@ -1,5 +1,68 @@
 const { useState, useRef, useEffect } = React;
 
+// PDF extraction using PDF.js
+function processPdfFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const typedarray = new Uint8Array(e.target.result);
+                const pdf = await window.pdfjsLib.getDocument({data: typedarray}).promise;
+                let text = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    text += content.items.map(item => item.str).join(' ') + '\n';
+                }
+                // Try to detect HTML table in extracted text
+                let csvDataResult = '';
+                if (text.includes('<table')) {
+                    csvDataResult = window.FileConverterUtils.htmlTableToCSV(text);
+                } else {
+                    csvDataResult = window.FileConverterUtils.advancedTextToCSV
+                        ? window.FileConverterUtils.advancedTextToCSV(text)
+                        : text;
+                }
+                resolve(csvDataResult);
+            } catch (error) {
+                reject(new Error('Failed to parse PDF: ' + error.message));
+            }
+        };
+        reader.onerror = () => reject(new Error('Failed to read PDF file'));
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+// Image OCR using Tesseract.js
+function processImageFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const { data: { text } } = await window.Tesseract.recognize(
+                    e.target.result,
+                    'nep+eng', // Nepali and English
+                    { logger: m => {/*console.log(m)*/} }
+                );
+                // Try to detect HTML table in OCR text
+                let csvDataResult = '';
+                if (text.includes('<table')) {
+                    csvDataResult = window.FileConverterUtils.htmlTableToCSV(text);
+                } else {
+                    csvDataResult = window.FileConverterUtils.advancedTextToCSV
+                        ? window.FileConverterUtils.advancedTextToCSV(text)
+                        : text;
+                }
+                resolve(csvDataResult);
+            } catch (error) {
+                reject(new Error('Failed to extract text from image: ' + error.message));
+            }
+        };
+        reader.onerror = () => reject(new Error('Failed to read image file'));
+        reader.readAsDataURL(file);
+    });
+}
+
 const FileConverter = () => {
     const [activeTab, setActiveTab] = useState('upload');
     const [csvData, setCsvData] = useState('');
@@ -51,14 +114,11 @@ Marketing Lead",Marketing,Marketing Manager,75000,22-05-2021,David Wilson,mary.j
     const handleFile = async (file) => {
         setIsLoading(true);
         hideMessages();
-
         try {
             const fileInfoText = `File: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
             setFileInfo(fileInfoText);
-
             const fileExtension = file.name.split('.').pop().toLowerCase();
             let csvDataResult = '';
-
             switch (fileExtension) {
                 case 'xlsx':
                 case 'xls':
@@ -71,13 +131,22 @@ Marketing Lead",Marketing,Marketing Manager,75000,22-05-2021,David Wilson,mary.j
                 case 'csv':
                     csvDataResult = await processTextFile(file);
                     break;
+                case 'pdf':
+                    csvDataResult = await processPdfFile(file);
+                    break;
+                case 'png':
+                case 'jpg':
+                case 'jpeg':
+                case 'bmp':
+                case 'gif':
+                case 'webp':
+                    csvDataResult = await processImageFile(file);
+                    break;
                 default:
-                    throw new Error('Unsupported file format. Please use .xlsx, .xls, .docx, .txt, or .csv files.');
+                    throw new Error('Unsupported file format. Please use .xlsx, .xls, .docx, .txt, .csv, .pdf, or image files.');
             }
-
             displayCSV(csvDataResult);
             setSuccessMessage('File processed successfully!');
-
         } catch (error) {
             setErrorMessage(window.FileConverterUtils ? 
                 window.FileConverterUtils.handleFileError(error, file.name) : 
@@ -184,14 +253,22 @@ Marketing Lead",Marketing,Marketing Manager,75000,22-05-2021,David Wilson,mary.j
 
     const processTextInput = () => {
         const text = textInput.trim();
-        
         if (!text) {
             setErrorMessage('Please enter some text data');
             return;
         }
-
         try {
-            const csvDataResult = convertTextToCSV(text);
+            let csvDataResult = '';
+            // Detect HTML table input in text
+            if (text.startsWith('<table') || text.includes('<table')) {
+                if (window.FileConverterUtils && window.FileConverterUtils.htmlTableToCSV) {
+                    csvDataResult = window.FileConverterUtils.htmlTableToCSV(text);
+                } else {
+                    throw new Error('HTML table parsing not available.');
+                }
+            } else {
+                csvDataResult = convertTextToCSV(text);
+            }
             displayCSV(csvDataResult);
             setSuccessMessage('Text converted successfully!');
         } catch (error) {
@@ -361,7 +438,7 @@ Marketing Lead",Marketing,Marketing Manager,75000,22-05-2021,David Wilson,mary.j
                                 ref={fileInputRef}
                                 type="file" 
                                 className="file-input" 
-                                accept=".xlsx,.xls,.docx,.txt,.csv"
+                                accept=".xlsx,.xls,.docx,.txt,.csv,.pdf,.png,.jpg,.jpeg,.bmp,.gif,.webp"
                                 onChange={handleFileSelect}
                             />
                         </div>
@@ -458,4 +535,4 @@ E002    Mary Jones    Marketing    Marketing Manager`}
 };
 
 // Render the React component
-ReactDOM.render(<FileConverter />, document.getElementById('root'));
+ReactDOM.render(<FileConverter />, document.getElementById('root'))
